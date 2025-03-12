@@ -1,0 +1,62 @@
+
+services:
+  api-service:
+    build:
+      context: ./src/services/api-service
+    image: api-service
+    container_name: api-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src/config:/app/config
+    environment:
+      - FIREBASE_CREDENTIALS=/app/config/alocacao-entregadores-firebase-credenciais.json
+      - VIRTUAL_HOST=api.local  
+      - VIRTUAL_PORT=8000      
+
+    networks:
+      - app-network
+
+  monitor-service:
+    build:
+      context: ./src/services/monitor-service
+    image: monitor-service
+    container_name: monitor-service
+    depends_on:
+      - api-service
+    networks:
+      - app-network
+    ports:
+      - "8089:8089"  # Interface Web do Locust
+    environment:
+      - FIREBASE_CREDENTIALS=/app/config/alocacao-entregadores-firebase-credenciais.json
+    volumes:
+      - ./src/config:/app/config
+
+  scaling-service:
+    build:
+      context: ./src/services/scaling-service
+    image: scaling-service
+    container_name: scaling-service
+    depends_on:
+      - monitor-service
+    networks:
+      - app-network
+    environment:
+      - FIREBASE_CREDENTIALS=/app/config/alocacao-entregadores-firebase-credenciais.json
+    volumes:
+      - ./src/config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+  
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
